@@ -46,14 +46,14 @@ let%expect_test "generated problems" =
          %{Math_game.For_testing.answer game#Int}"]);
   [%expect
     {|
-    95 / 5 = ?  19
-    3 x 5 = ?  15
-    12 - 2 = ?  10
-    11 - 7 = ?  4
-    5 - 4 = ?  1
-    24 / 2 = ?  12
-    13 + 4 = ?  17
-    80 / 5 = ?  16
+    35 / 7 + 14 = ?  19
+    3 x 7 - 6 = ?  15
+    6 + 2 x 2 = ?  10
+    54 / 6 - 5 = ?  4
+    8 x 6 - 47 = ?  1
+    27 - 3 x 5 = ?  12
+    40 / 8 + 12 = ?  17
+    9 / 3 + 13 = ?  16
     |}]
 ;;
 
@@ -63,13 +63,13 @@ let%test "every answer is between 1 and 20" =
     answer >= 1 && answer <= 20)
 ;;
 
-(* Both operands stay typable and mentally tractable: division caps the
-   dividend at two digits, and the widest right operand is addition's
-   ([1 + 19]). Nothing may be negative, fractional, or unbounded. *)
-let%test "operands stay small and positive" =
+(* Every number must be doable in one's head: the widest is the [number] of a
+   [number - term] problem, which tops out at [20 + 60]. Nothing may be
+   negative or unbounded. *)
+let%test "numbers stay small and positive" =
   List.for_all (seeds ~count:500) ~f:(fun game ->
-    let left, right = Math_game.For_testing.operands game in
-    left >= 1 && left <= 99 && right >= 1 && right <= 19)
+    List.for_all (Math_game.For_testing.numbers game) ~f:(fun number ->
+      number >= 1 && number <= 99))
 ;;
 
 let%expect_test "all four operators show up" =
@@ -89,14 +89,28 @@ let%expect_test "all four operators show up" =
     |}]
 ;;
 
-let%test "division problems divide exactly" =
+let%test "division always comes out even" =
   List.for_all (seeds ~count:500) ~f:(fun game ->
-    let left, right = Math_game.For_testing.operands game in
-    match
-      String.is_substring (Math_game.For_testing.problem game) ~substring:"/"
-    with
-    | false -> true
-    | true -> left % right = 0)
+    match Math_game.For_testing.division game with
+    | None -> true
+    | Some (dividend, divisor) -> dividend % divisor = 0)
+;;
+
+(* The point of the change: every problem is two steps, never one. *)
+let%test "every problem has exactly two operators" =
+  List.for_all (seeds ~count:500) ~f:(fun game ->
+    let operators =
+      String.count (Math_game.For_testing.problem game) ~f:(fun char ->
+        List.mem [ '+'; '-'; 'x'; '/' ] char ~equal:Char.equal)
+    in
+    operators = 2)
+;;
+
+(* The answer is also the click count, so this bound is a gameplay
+   constraint, not just an arithmetic one. *)
+let%test "the answer never exceeds 20 clicks" =
+  List.for_all (seeds ~count:500) ~f:(fun game ->
+    Math_game.For_testing.answer game <= 20)
 ;;
 
 let%expect_test "the right answer starts the clicking phase" =
@@ -104,7 +118,9 @@ let%expect_test "the right answer starts the clicking phase" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed "") (wrong_attempts 0))))
     |}];
@@ -112,7 +128,9 @@ let%expect_test "the right answer starts the clicking phase" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Clicking (clicks_remaining 15) (fill_remaining 0s))))
     |}];
@@ -133,7 +151,9 @@ let%expect_test "the Enter button submits like the Return key" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Clicking (clicks_remaining 15) (fill_remaining 0s))))
     |}]
@@ -150,7 +170,9 @@ let%expect_test "a wrong answer clears the field and keeps the problem" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed "") (wrong_attempts 1))))
     |}]
@@ -161,7 +183,9 @@ let%expect_test "non-digits are ignored and backspace deletes" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed 12) (wrong_attempts 0))))
     |}];
@@ -170,7 +194,9 @@ let%expect_test "non-digits are ignored and backspace deletes" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed "") (wrong_attempts 0))))
     |}]
@@ -181,7 +207,9 @@ let%expect_test "the field holds at most two digits" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed 12) (wrong_attempts 0))))
     |}]
@@ -192,7 +220,9 @@ let%expect_test "submitting an empty field does nothing" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed "") (wrong_attempts 0))))
     |}]
@@ -225,7 +255,9 @@ let%expect_test "the checkbox is inert until the math is solved" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Solving_math (typed "") (wrong_attempts 0))))
     |}]
@@ -236,7 +268,9 @@ let%expect_test "the check blinks out well before the next click" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Clicking (clicks_remaining 14) (fill_remaining 100ms))))
     |}];
@@ -249,7 +283,9 @@ let%expect_test "the check blinks out well before the next click" =
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
-    ((problem ((left 3) (operator Multiply) (right 5)))
+    ((problem
+      ((term ((left 3) (operator Multiply) (right 7))) (add_operator Subtract)
+       (number 6) (shape Term_first)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
      (phase (Clicking (clicks_remaining 14) (fill_remaining 0s))))
     |}]
