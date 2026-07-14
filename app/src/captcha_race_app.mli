@@ -8,6 +8,8 @@
       buttons per view so rendering and hit-testing agree.
     - {!Render} turns a model into pixels — the only module here that issues
       [Graphics] calls.
+    - {!Pixel_font} is the pure bitmap display font (Press Start 2P stand-in)
+      {!Render} draws titles, HUD labels, buttons, and ranks with.
 
     Built on top of {!Captcha_race_engine}; the concrete mini-games it runs
     are supplied as a pool from [bin/main.ml], so this library stays
@@ -16,4 +18,5 @@
 
 module App_state = App_state
 module Button = Button
+module Pixel_font = Pixel_font
 module Render = Render
