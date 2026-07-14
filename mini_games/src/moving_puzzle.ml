@@ -20,21 +20,27 @@ type t =
 
 let name = "slide the puzzle"
 
-(* Layout constants, all in pixels. *)
-let piece_size = 60
-let track_h = 44
-let handle_w = 56
-let margin = 40
+(* Layout constants, all in pixels. Sized to fit a compact play area — the
+   pieces stack vertically as slider / label / puzzle, so nothing overlaps
+   even on the small CRT screen. *)
+let piece_size = 48
+let track_h = 22
+let handle_w = 48
+let margin = 16
+let label_gap = 10
 let tolerance = 10
 
 (* Everything below is derived from [bounds] so the layout scales with the
-   play area and nothing is hard-coded to a particular window size. *)
+   play area and nothing is hard-coded to a particular window size. The
+   slider sits along the bottom, the instruction label just above it, and the
+   puzzle piece and slot fill the top of the area. *)
 let track_x (b : Geometry.Rect.t) = b.x + margin
 let track_y (b : Geometry.Rect.t) = b.y + margin
 let track_w (b : Geometry.Rect.t) = b.w - (2 * margin)
 let max_offset b = track_w b - handle_w
+let label_y (b : Geometry.Rect.t) = track_y b + track_h + label_gap
 let piece_left (b : Geometry.Rect.t) = b.x + margin
-let piece_y (b : Geometry.Rect.t) = b.y + (b.h * 3 / 5)
+let piece_y (b : Geometry.Rect.t) = b.y + b.h - piece_size - margin
 
 let handle_rect t : Geometry.Rect.t =
   { x = track_x t.bounds + t.offset
@@ -116,9 +122,13 @@ let draw t =
     Graphics.draw_rect rect.x rect.y rect.w rect.h
   in
   let b = t.bounds in
-  Graphics.set_color (Graphics.rgb 60 60 60);
-  Graphics.moveto (b.x + margin) (b.y + b.h - 40);
-  Graphics.draw_string "Slide the piece into the empty slot";
+  (* Instruction sits in the band just above the slider, centred. Dark ink so
+     it reads on the light card the game is drawn on. *)
+  let label = "Slide the piece into the slot" in
+  let label_w, (_ : int) = Graphics.text_size label in
+  Graphics.set_color (Graphics.rgb 60 58 52);
+  Graphics.moveto (b.x + ((b.w - label_w) / 2)) (label_y b);
+  Graphics.draw_string label;
   (* The empty slot: a recessed grey square outline. *)
   draw_box
     (slot_rect t)
@@ -162,5 +172,6 @@ let draw t =
 module For_testing = struct
   let target_offset t = t.target
   let handle_rect = handle_rect
+  let slot_rect = slot_rect
   let offset t = t.offset
 end

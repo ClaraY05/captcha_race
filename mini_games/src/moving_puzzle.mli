@@ -37,4 +37,8 @@ module For_testing : sig
   (** The handle's rectangle, so tests know where to grab and how far it has
       travelled. *)
   val handle_rect : t -> Geometry.Rect.t
+
+  (** The target slot's rectangle, for checking it stays inside the play
+      area. *)
+  val slot_rect : t -> Geometry.Rect.t
 end

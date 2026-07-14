@@ -104,17 +104,17 @@ let%expect_test "the slot sits within the play area and to the right of the \
   let game = create () in
   let target = Moving_puzzle.For_testing.target_offset game in
   let bounds = Layout.play_bounds in
+  let slot = Moving_puzzle.For_testing.slot_rect game in
+  let within (rect : Geometry.Rect.t) =
+    rect.x >= bounds.x
+    && rect.y >= bounds.y
+    && rect.x + rect.w <= bounds.x + bounds.w
+    && rect.y + rect.h <= bounds.y + bounds.h
+  in
   print_s
     [%message
       ""
         ~target_is_a_real_drag:(target > 0 : bool)
-        ~stays_in_bounds:
-          (Moving_puzzle.For_testing.offset
-             (grab_and_drag_to game ~offset:target)
-           + 60
-           + bounds.x
-           + 40
-           <= bounds.x + bounds.w
-           : bool)];
-  [%expect {| ((target_is_a_real_drag true) (stays_in_bounds true)) |}]
+        ~slot_within_bounds:(within slot : bool)];
+  [%expect {| ((target_is_a_real_drag true) (slot_within_bounds true)) |}]
 ;;
