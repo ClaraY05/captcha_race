@@ -56,6 +56,8 @@ application/UI layer; depends on `captcha_race` + `engine` + `graphics`.
 - `Button` — a clickable labeled region + hit-testing.
 - `Render` — the ONLY library module that issues `Graphics` drawing
   calls (mini-games draw themselves, but only from here).
+- `Click_ripple` — the expanding ring every click leaves, wherever it
+  lands; held by `Model` and drawn last by `Render`.
 
 **`mini_games/`** — `captcha_race.mini_games`, module
 `Captcha_race_mini_games`. The concrete captchas; depends on
@@ -63,11 +65,17 @@ application/UI layer; depends on `captcha_race` + `engine` + `graphics`.
 
 - `Placeholder_game` — the trivial reference mini-game (click the box);
   the model to copy for real games.
+- `Math_game` — solve an arithmetic problem, then click the reCAPTCHA
+  checkbox that many times (the problem is gone by then).
 
-**`bin/main.ml`** — owns the window and the non-blocking ~60 fps event
-loop; assembles the mini-game pool, polls input, runs pure transitions,
-draws, and saves the leaderboard when it changes. Depends on all four
-libraries (it's where they meet).
+**`bin/main.ml`** — owns the window and the non-blocking event loop;
+assembles the mini-game pool, polls input, runs pure transitions, draws,
+and saves the leaderboard when it changes. Depends on all four libraries
+(it's where they meet). Input is polled every ~1ms and each poll steps
+the model, while drawing happens at ~60 fps: `Graphics` reports only
+whether the button is down *right now* (clicks are never queued), so
+sampling once per frame would silently drop any press and release that
+fell inside the same frame — fatal for a game that counts clicks.
 
 Dependency direction: everything builds on `captcha_race`; then
 `mini_games → engine ← app`, and `bin → all`. The app never depends on

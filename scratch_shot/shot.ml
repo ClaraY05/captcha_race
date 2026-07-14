@@ -24,7 +24,12 @@ let () =
     match
       Game_runner.advance
         runner
-        ~input:{ Input.idle with mouse; mouse_down = down; mouse_clicked = clicked }
+        ~input:
+          { Input.idle with
+            mouse
+          ; mouse_down = down
+          ; mouse_clicked = clicked
+          }
         ~now:Time_ns.epoch
         ~elapsed:Time_ns.Span.zero
     with
@@ -35,6 +40,7 @@ let () =
   let model =
     { App_state.Model.view = App_state.Playing runner
     ; leaderboard = Leaderboard.empty
+    ; ripple = None
     }
   in
   Render.draw model ~now:Time_ns.epoch;

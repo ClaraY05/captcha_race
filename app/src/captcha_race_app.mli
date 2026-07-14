@@ -8,6 +8,9 @@
       buttons per view so rendering and hit-testing agree.
     - {!Render} turns a model into pixels — the only module here that issues
       [Graphics] calls.
+    - {!Click_ripple} is the expanding ring every click leaves, whatever it
+      landed on; {!App_state.Model} carries the latest one and {!Render}
+      draws it on top.
     - {!Pixel_font} is the pure bitmap display font (Press Start 2P stand-in)
       {!Render} draws titles, HUD labels, buttons, and ranks with.
 
@@ -18,5 +21,6 @@
 
 module App_state = App_state
 module Button = Button
+module Click_ripple = Click_ripple
 module Pixel_font = Pixel_font
 module Render = Render

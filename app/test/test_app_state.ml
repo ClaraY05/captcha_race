@@ -53,7 +53,10 @@ let show_view (model : App_state.Model.t) =
 ;;
 
 let initial =
-  { App_state.Model.view = Menu; leaderboard = Leaderboard.empty }
+  { App_state.Model.view = Menu
+  ; leaderboard = Leaderboard.empty
+  ; ripple = None
+  }
 ;;
 
 let%expect_test "menu <-> leaderboard navigation" =
