@@ -1,5 +1,5 @@
 (executable
  (name main)
- (libraries sandbox_hello core)
+ (libraries captcha_race core core_unix graphics)
  (preprocess
   (pps ppx_jane)))

@@ -1,58 +1,85 @@
-# OCaml project template
+# Captcha Race
 
-A blank OCaml project in the Jane Street style: [`Core`](https://opam.ocaml.org/packages/core/)
-as the standard library, `ppx_jane` for deriving, `dune` for builds, expect
-tests, and the `janestreet` ocamlformat profile. Wired up with GitHub Actions
-and the Claude GitHub Action.
+A single-player OCaml game: solve a gauntlet of 10 randomly chosen
+captcha mini-games as fast as you can. Your time — from the start of
+the first captcha to the end of the last — lands on a leaderboard,
+fastest first, persisted between runs.
 
-Click **"Use this template"** to start a new project from it.
+Built in the Jane Street style:
+[`Core`](https://opam.ocaml.org/packages/core/) as the standard
+library, `ppx_jane` for deriving, `dune` for builds, expect tests, the
+`janestreet` ocamlformat profile, and the OCaml
+[`graphics`](https://opam.ocaml.org/packages/graphics/) library for the
+window.
 
-## First use: rename the package
+## How to play
 
-Everything is named `sandbox` as a placeholder. To rename it to `<your_name>`:
+```sh
+dune exec bin/main.exe   # needs a graphical display
+```
 
-1. `dune-project` — the `(name sandbox)` in the `(package ...)` stanza.
-2. `lib/hello/src/dune` and `lib/hello/test/dune` — `sandbox_hello`,
-   `sandbox.hello`, `sandbox_hello_test`.
-3. `lib/hello/src/sandbox_hello.ml` / `.mli` — rename both files, and update
-   the `open Sandbox_hello` references in `bin/main.ml` and
-   `lib/hello/test/test_hello.ml`.
+- **Menu** — click **Play** to start a race or **Leaderboard** to see
+  your best times.
+- **Playing** — solve each captcha to advance to the next; a **Quit**
+  button in the top-right abandons the race (nothing is recorded).
+- After the 10th captcha your total time is saved to
+  `~/.captcha_race_scores.sexp` and you're back at the menu.
 
-The generated `sandbox.opam` is produced by dune from `dune-project` — don't
-edit it by hand; it regenerates on the next `dune build`.
+On a headless machine the window can't open (`graphics` needs an X
+server); `xvfb-run -a dune exec bin/main.exe` works for smoke tests.
+
+## Adding a mini-game
+
+Mini-games are pluggable. Implement
+`Captcha_race.Mini_game_intf.S` (copy
+`lib/captcha_race/src/placeholder_game.ml` as a starting point),
+re-export the module from `captcha_race.ml`/`.mli`, and register it in
+the pool in `bin/main.ml`:
+
+```ocaml
+let pool =
+  [ Mini_game.pack (module Placeholder_game)
+  ; Mini_game.pack (module My_game)
+  ]
+```
+
+Each race samples 10 games from the pool. One rule matters: **no
+`Graphics` calls outside `draw`** — everything else must stay
+display-free so the logic is testable headlessly. See `CLAUDE.md` for
+the full architecture and conventions.
 
 ## Build, test, format
 
 ```sh
 dune build                      # compile
-dune runtest                    # run tests
+dune runtest                    # run tests (headless-safe; CI runs this)
 dune fmt --auto-promote         # format (.ocamlformat: janestreet profile)
-dune exec bin/main.exe -- Ada   # run the example binary
 ```
+
+All game logic (sequencing, timing, leaderboard, hit-testing) is pure
+and covered by expect tests in `lib/captcha_race/test/`; only
+`Render` and `bin/main.ml` touch the display, and no test ever opens
+one.
 
 ## GitHub Actions
 
-Two workflows ship with this template:
-
-- **`.github/workflows/ci.yml`** — builds, tests, and checks formatting on
-  every push to `main` and every PR. Self-contained via `ocaml/setup-ocaml`;
-  needs no secrets.
+- **`.github/workflows/ci.yml`** — builds, tests, and checks formatting
+  on every push to `main` and every PR. Self-contained via
+  `ocaml/setup-ocaml`; needs no secrets.
 - **`.github/workflows/claude.yml`** — runs the
-  [Claude Code Action](https://github.com/anthropics/claude-code-action) when
-  someone writes `@claude` in an issue or PR.
-
-The Claude workflow needs an `ANTHROPIC_API_KEY` secret, which is **not**
-copied when you create a repo from this template. In each new repo add it under
-**Settings → Secrets and variables → Actions**, or set it as an **organization
-secret** so all repos inherit it. (You can instead use a
-`CLAUDE_CODE_OAUTH_TOKEN` from `/install-github-app`.)
+  [Claude Code Action](https://github.com/anthropics/claude-code-action)
+  when someone writes `@claude` in an issue or PR. Needs an
+  `ANTHROPIC_API_KEY` secret (or a `CLAUDE_CODE_OAUTH_TOKEN` from
+  `/install-github-app`).
 
 ## Layout
 
 ```
-lib/hello/src/    example library (Sandbox_hello.Hello)
-lib/hello/test/   expect tests
-bin/main.ml       example executable
+lib/captcha_race/src/    the game library (state machine, runner,
+                         mini-game interface, leaderboard, render)
+lib/captcha_race/test/   headless expect tests
+bin/main.ml              the executable: window + event loop
 ```
 
-See `CLAUDE.md` for the full code conventions.
+See `CLAUDE.md` for the architecture, the mini-game contract, and the
+full code conventions.
