@@ -216,8 +216,10 @@ let is_solved t =
    full, so two digits is the whole field. *)
 let max_digits = 2
 
-(* Long enough to see, short enough that it is gone before the next click. *)
-let fill_duration = Time_ns.Span.of_int_ms 400
+(* A blink, not a state: the check must be gone well before the next click
+   lands, so a fast run reads as a string of distinct flashes rather than one
+   long fill. Two rendered frames is enough to be seen. *)
+let fill_duration = Time_ns.Span.of_int_ms 100
 
 let apply_key typed key =
   match key with

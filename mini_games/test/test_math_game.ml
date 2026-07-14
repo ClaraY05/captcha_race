@@ -231,20 +231,20 @@ let%expect_test "the checkbox is inert until the math is solved" =
     |}]
 ;;
 
-let%expect_test "a filled checkbox clears itself after 400ms" =
+let%expect_test "the check blinks out well before the next click" =
   let game = click_checkbox (solve_math (create ())) in
   print_s [%sexp (game : Math_game.t)];
   [%expect
     {|
     ((problem ((left 3) (operator Multiply) (right 5)))
      (bounds ((x 196) (y 226) (w 408) (h 152)))
-     (phase (Clicking (clicks_remaining 14) (fill_remaining 400ms))))
+     (phase (Clicking (clicks_remaining 14) (fill_remaining 100ms))))
     |}];
   let game =
     Math_game.update
       game
       ~input:Input.idle
-      ~elapsed:(Time_ns.Span.of_int_ms 500)
+      ~elapsed:(Time_ns.Span.of_int_ms 150)
   in
   print_s [%sexp (game : Math_game.t)];
   [%expect

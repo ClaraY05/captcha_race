@@ -8,8 +8,10 @@
     Phase two {e replaces} the problem with an "I'm not a robot" reCAPTCHA
     box. The problem is no longer on screen, so the player must have
     memorized their answer: the game is solved only once the checkbox has
-    been clicked exactly that many times. The checkbox fills briefly on each
-    click to confirm the click landed, but never shows the running count.
+    been clicked exactly that many times. The checkbox blinks a check on each
+    click to confirm the click landed and clears again immediately, so a fast
+    run reads as a string of distinct flashes; it never shows the running
+    count.
 
     Like every {!Captcha_race_engine.Mini_game_intf.S} this is display-free
     outside [draw], and takes all its randomness from the injected
