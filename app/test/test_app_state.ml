@@ -73,10 +73,11 @@ let%expect_test "each view offers the right buttons" =
         [%sexp
           (List.map (App_state.buttons view) ~f:(fun button -> button.label)
            : string list)]);
-  [%expect {|
-    (Play Leaderboard)
-    (Back)
-    (Quit)
+  [%expect
+    {|
+    (PLAY LEADERBOARD)
+    ("PLAY AGAIN" MENU)
+    (QUIT)
     |}]
 ;;
 

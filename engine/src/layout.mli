@@ -1,11 +1,14 @@
-(** Shared screen geometry: the window size and the region mini-games draw
-    in.
+(** Shared screen geometry: the window, the CRT screen surface, and the
+    region mini-games draw in.
 
-    [play_bounds] is the contract between [Render] — which lays out the
-    window and the HUD strip — and every mini-game, whose [create] is handed
-    these bounds. It lives in the engine rather than the app so that game
-    logic and headless tests can reference it without depending on the
-    rendering layer.
+    The game is presented on a pixel-art CRT monitor. [screen] is the dark
+    drawable surface inside the bezel — the region all three views render
+    into — and [play_bounds] is the captcha card's interior at the centre of
+    it, handed to every mini-game's [create]. Both live in the engine rather
+    than the app so game logic, headless tests, and the button layout in
+    {!Captcha_race_app.App_state} can reference them without depending on the
+    rendering layer; {!Captcha_race_app.Render} frames them with the CRT
+    chrome.
 
     {[
       Placeholder_game.create ~random ~bounds:Layout.play_bounds
@@ -19,6 +22,11 @@ val window_width : int
 
 val window_height : int
 
-(** The region a mini-game may draw in: the window minus the HUD strip along
-    the top. Passed as [bounds] to every game's [create]. *)
+(** The dark CRT screen surface inside the bezel; every view renders within
+    it and buttons sit inside it. *)
+val screen : Geometry.Rect.t
+
+(** The captcha card's interior: a centred region inside {!screen} where the
+    active mini-game draws. Passed as [bounds] to every game's [create];
+    {!Captcha_race_app.Render} draws the card chrome around it. *)
 val play_bounds : Geometry.Rect.t
