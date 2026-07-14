@@ -36,6 +36,7 @@ open Captcha_race_mini_games
 let pool =
   [ Mini_game.pack (module Placeholder_game)
   ; Mini_game.pack (module Math_game)
+  ; Mini_game.pack (module Moving_puzzle)
   ]
 ;;
 
