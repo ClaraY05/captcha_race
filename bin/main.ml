@@ -37,6 +37,7 @@ let pool =
   [ Mini_game.pack (module Placeholder_game)
   ; Mini_game.pack (module Math_game)
   ; Mini_game.pack (module Moving_puzzle)
+  ; Mini_game.pack (module Typing_game)
   ]
 ;;
 
