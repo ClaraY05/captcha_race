@@ -79,11 +79,32 @@ let draw_playing runner ~now =
   | Some game -> Mini_game.draw game
 ;;
 
+(* Drawn last so it rides on top of buttons and mini-games alike. *)
+let draw_ripple ripple ~now =
+  match Click_ripple.radius ripple ~now with
+  | None -> ()
+  | Some radius ->
+    let { Geometry.Point.x; y } = Click_ripple.center ripple in
+    (* Fade by thinning the ring as it grows, since [Graphics] has no alpha. *)
+    let width =
+      match radius * 2 <= Click_ripple.end_radius with
+      | true -> 3
+      | false -> 2
+    in
+    Graphics.set_color (Graphics.rgb 90 120 200);
+    Graphics.set_line_width width;
+    Graphics.draw_circle x y radius;
+    Graphics.set_line_width 1
+;;
+
 let draw (model : App_state.Model.t) ~now =
   clear ();
   (match model.view with
    | Menu -> draw_menu ()
    | Leaderboard -> draw_leaderboard model.leaderboard
    | Playing runner -> draw_playing runner ~now);
-  List.iter (App_state.buttons model.view) ~f:draw_button
+  List.iter (App_state.buttons model.view) ~f:draw_button;
+  match model.ripple with
+  | None -> ()
+  | Some ripple -> draw_ripple ripple ~now
 ;;

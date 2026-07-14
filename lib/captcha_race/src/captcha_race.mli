@@ -10,11 +10,12 @@
     - {!Mini_game_intf.S} is the contract a mini-game implements;
       {!Mini_game} packs implementations so the runner can drive a
       heterogeneous mix of them. {!Placeholder_game} is the reference
-      implementation.
+      implementation, and {!Math_game} is the two-phase arithmetic captcha.
     - {!Leaderboard} keeps completion times fastest-first and persists them
       to disk as a sexp file.
     - {!Geometry}, {!Input} and {!Button} are the pure building blocks for
-      layout, per-frame input snapshots and click hit-testing.
+      layout, per-frame input snapshots and click hit-testing;
+      {!Click_ripple} is the visible acknowledgement every click leaves.
     - {!Render} is the only module that draws; the window and event loop live
       in [bin/main.ml].
 
@@ -23,10 +24,12 @@
 
 module App_state = App_state
 module Button = Button
+module Click_ripple = Click_ripple
 module Game_runner = Game_runner
 module Geometry = Geometry
 module Input = Input
 module Leaderboard = Leaderboard
+module Math_game = Math_game
 module Mini_game = Mini_game
 module Mini_game_intf = Mini_game_intf
 module Placeholder_game = Placeholder_game

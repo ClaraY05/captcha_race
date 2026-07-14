@@ -19,6 +19,7 @@ module Model = struct
   type nonrec t =
     { view : t
     ; leaderboard : Leaderboard.t
+    ; ripple : Click_ripple.t option
     }
   [@@deriving sexp_of]
 end
@@ -78,6 +79,17 @@ let buttons view =
     ]
 ;;
 
+(* Every click leaves a ripple, whatever the click landed on and whatever
+   view we are in — including clicks a mini-game ignores. *)
+let record_click (model : Model.t) ~(input : Input.t) ~now =
+  match input.mouse_clicked with
+  | false -> model
+  | true ->
+    { model with
+      Model.ripple = Some (Click_ripple.create ~center:input.mouse ~now)
+    }
+;;
+
 let apply_action (model : Model.t) (action : Action.t) ~pool ~random ~now =
   match action with
   | View_leaderboard -> Ok { model with Model.view = Leaderboard }
@@ -104,7 +116,8 @@ let advance (model : Model.t) ~input ~now ~elapsed =
        let entry =
          { Leaderboard.Entry.completion_time; achieved_at = now }
        in
-       { Model.view = Menu
+       { model with
+         Model.view = Menu
        ; leaderboard = Leaderboard.add model.leaderboard entry
        })
 ;;

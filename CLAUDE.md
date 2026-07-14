@@ -35,9 +35,13 @@ The library lives in `lib/captcha_race/src/`; `Captcha_race.*` below.
   snapshots, click hit-testing.
 - `Render` — the ONLY library module that issues `Graphics` drawing
   calls (mini-games draw themselves, but only from here).
-- `bin/main.ml` — owns the window and the non-blocking ~60 fps event
-  loop; polls input, runs pure transitions, draws, saves the
-  leaderboard when it changes.
+- `bin/main.ml` — owns the window and the non-blocking event loop; polls
+  input, runs pure transitions, draws, saves the leaderboard when it
+  changes. Input is polled every ~1ms and each poll steps the model,
+  while drawing happens at ~60 fps: `Graphics` reports only whether the
+  button is down *right now* (clicks are never queued), so sampling once
+  per frame would silently drop any press and release that fell inside
+  the same frame — fatal for a game that counts clicks.
 
 Data flow: event loop → `Input.t` → `App_state.advance` /
 `apply_action` → `Game_runner.advance` → active mini-game's `update` →

@@ -37,6 +37,9 @@ module Model : sig
   type nonrec t =
     { view : t
     ; leaderboard : Leaderboard.t
+    ; ripple : Click_ripple.t option
+    (** the player's most recent click, drawn as an expanding ring; [None]
+        before the first click of the session *)
     }
   [@@deriving sexp_of]
 end
@@ -55,6 +58,12 @@ val play_bounds : Geometry.Rect.t
     and the event loop hit-tests against them, so the two can never disagree
     about where buttons are. *)
 val buttons : t -> Action.t Button.t list
+
+(** [record_click model ~input ~now] starts a {!Click_ripple.t} at the
+    pointer if [input] clicked this frame, so that every click gets visible
+    acknowledgement no matter what it landed on. The event loop applies this
+    to every input, alongside {!apply_action} or {!advance}. *)
+val record_click : Model.t -> input:Input.t -> now:Time_ns.t -> Model.t
 
 (** [apply_action model action ~pool ~random ~now] is the model after a
     button click. Errors only if [Play] is clicked with a broken
