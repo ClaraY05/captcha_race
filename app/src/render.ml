@@ -64,15 +64,28 @@ let text_right ~color ~right ~y s =
   text ~color ~x:(right - w) ~y s
 ;;
 
-(* A hard 2px drop shadow: the flat-pixel echo of the design's [text-shadow]. *)
-let text_shadow ~color ~x ~y s =
-  text ~color:c_title_shadow ~x:(x + 2) ~y:(y - 2) s;
-  text ~color ~x ~y s
+(* Press Start 2P display text: {!Pixel_font} geometry rendered as filled
+   pixel blocks. Used for titles, HUD labels, buttons, and ranks — the roles
+   the design sets in Press Start 2P. Body text stays in the built-in font,
+   which already reads like the design's VT323. *)
+let pixel_text ~color ~x ~y ~scale s =
+  Graphics.set_color color;
+  Pixel_font.foreach_pixel s ~scale ~x ~y ~f:(fun ~x ~y ~size ->
+    Graphics.fill_rect x y size size)
 ;;
 
-let text_centered_shadow ~color ~cx ~y s =
-  let w, (_ : int) = Graphics.text_size s in
-  text_shadow ~color ~x:(cx - (w / 2)) ~y s
+let pixel_centered ~color ~cx ~y ~scale s =
+  pixel_text ~color ~x:(cx - (Pixel_font.width s ~scale / 2)) ~y ~scale s
+;;
+
+(* Display text with the design's hard offset shadow (one pixel cell). *)
+let pixel_shadow ~color ~x ~y ~scale s =
+  pixel_text ~color:c_title_shadow ~x:(x + scale) ~y:(y - scale) ~scale s;
+  pixel_text ~color ~x ~y ~scale s
+;;
+
+let pixel_centered_shadow ~color ~cx ~y ~scale s =
+  pixel_shadow ~color ~x:(cx - (Pixel_font.width s ~scale / 2)) ~y ~scale s
 ;;
 
 (* A raised beige panel: light along the top-left, shade along the
@@ -107,10 +120,11 @@ let draw_button (button : App_state.Action.t Button.t) =
   let bg, fg = button_colors button.action in
   fill c_shadow ~x:(x + 3) ~y:(y - 3) ~w ~h;
   fill bg ~x ~y ~w ~h;
-  text_centered
+  pixel_centered
     ~color:fg
     ~cx:(x + (w / 2))
-    ~y:(y + ((h - line_h) / 2))
+    ~y:(y + ((h - (Pixel_font.cell_h * 2)) / 2))
+    ~scale:2
     button.label
 ;;
 
@@ -164,7 +178,7 @@ let best_label (model : App_state.Model.t) =
 let draw_menu (model : App_state.Model.t) =
   let cx = 400 in
   text_centered ~color:c_accent_dim ~cx ~y:490 "* SINGLE PLAYER *";
-  text_centered_shadow ~color:c_text ~cx ~y:452 "CAPTCHA RACE";
+  pixel_centered_shadow ~color:c_text ~cx ~y:440 ~scale:4 "CAPTCHA RACE";
   text_centered
     ~color:c_text_dim
     ~cx
@@ -178,14 +192,15 @@ let draw_menu (model : App_state.Model.t) =
 ;;
 
 let draw_hud_round ~round ~count =
+  let y = 500 in
+  let scale = 2 in
   let x = 150 in
-  let y = 502 in
-  text ~color:c_text_dim ~x ~y "ROUND ";
-  let w, (_ : int) = Graphics.text_size "ROUND " in
+  pixel_text ~color:c_text_dim ~x ~y ~scale "ROUND ";
+  let x = x + Pixel_font.width "ROUND " ~scale in
   let n = Int.to_string round in
-  text ~color:c_accent ~x:(x + w) ~y n;
-  let wn, (_ : int) = Graphics.text_size n in
-  text ~color:c_text_dim ~x:(x + w + wn) ~y [%string "/%{count#Int}"]
+  pixel_text ~color:c_accent ~x ~y ~scale n;
+  let x = x + Pixel_font.width n ~scale in
+  pixel_text ~color:c_text_dim ~x ~y ~scale [%string "/%{count#Int}"]
 ;;
 
 let draw_pips ~current ~count =
@@ -246,7 +261,7 @@ let draw_playing runner ~now =
 ;;
 
 let draw_leaderboard (model : App_state.Model.t) =
-  text_shadow ~color:c_accent ~x:160 ~y:495 "* LEADERBOARD";
+  pixel_shadow ~color:c_accent ~x:160 ~y:488 ~scale:3 "* LEADERBOARD";
   text_right ~color:c_text_faint ~right:640 ~y:497 "fastest 10-captcha runs";
   match Leaderboard.entries model.leaderboard with
   | [] ->
@@ -270,7 +285,12 @@ let draw_leaderboard (model : App_state.Model.t) =
           | _ -> c_text_faint
         in
         let strong = i < 3 in
-        text ~color:medal ~x:172 ~y:(ry + 7) [%string "#%{i + 1#Int}"];
+        pixel_text
+          ~color:medal
+          ~x:172
+          ~y:(ry + 6)
+          ~scale:2
+          [%string "#%{i + 1#Int}"];
         text
           ~color:(if strong then c_text else c_text_dim)
           ~x:220
