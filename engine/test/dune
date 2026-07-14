@@ -1,0 +1,12 @@
+(library
+ (name captcha_race_engine_test)
+ (libraries
+  captcha_race
+  captcha_race_engine
+  core
+  core_unix.filename_unix
+  core_unix.sys_unix
+  expect_test_helpers_core)
+ (inline_tests)
+ (preprocess
+  (pps ppx_jane)))

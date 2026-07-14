@@ -1,0 +1,6 @@
+(library
+ (name captcha_race_app)
+ (public_name captcha_race.app)
+ (libraries core captcha_race captcha_race_engine graphics)
+ (preprocess
+  (pps ppx_jane)))

@@ -6,16 +6,20 @@
     than a blocking [wait_next_event], so that animated mini-games keep
     moving between input events. Each frame: poll input into an
     {!Captcha_race.Input.t}, run the pure transitions in
-    {!Captcha_race.App_state}, draw via {!Captcha_race.Render}, then sleep
-    off the rest of the frame.
+    {!Captcha_race_app.App_state}, draw via {!Captcha_race_app.Render}, then
+    sleep off the rest of the frame.
 
     This file (plus [Render] and each game's [draw]) is the only place
     [Graphics] is touched; everything else is display-free and covered by
     expect tests. To add a mini-game, implement
-    {!Captcha_race.Mini_game_intf.S} and add it to [pool] below. *)
+    {!Captcha_race_engine.Mini_game_intf.S} in the [captcha_race.mini_games]
+    library and add it to [pool] below. *)
 
 open! Core
 open Captcha_race
+open Captcha_race_engine
+open Captcha_race_app
+open Captcha_race_mini_games
 
 (* The mini-games a race can be built from. Register new games here. *)
 let pool = [ Mini_game.pack (module Placeholder_game) ]
@@ -73,8 +77,7 @@ let step (model : App_state.Model.t) ~input ~random ~now ~elapsed =
 let () =
   (match
      Graphics.open_graph
-       [%string
-         " %{App_state.window_width#Int}x%{App_state.window_height#Int}"]
+       [%string " %{Layout.window_width#Int}x%{Layout.window_height#Int}"]
    with
    | () -> ()
    | exception Graphics.Graphic_failure message ->
