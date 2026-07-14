@@ -22,7 +22,11 @@ open Captcha_race_app
 open Captcha_race_mini_games
 
 (* The mini-games a race can be built from. Register new games here. *)
-let pool = [ Mini_game.pack (module Placeholder_game) ]
+let pool =
+  [ Mini_game.pack (module Placeholder_game)
+  ; Mini_game.pack (module Moving_puzzle)
+  ]
+;;
 
 let leaderboard_path =
   match Sys.getenv "HOME" with

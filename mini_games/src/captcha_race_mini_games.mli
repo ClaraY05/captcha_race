@@ -6,6 +6,8 @@
     this library, re-export it below, and add it to that pool.
 
     {!Placeholder_game} is the trivial reference implementation (click the
-    box) and the model to copy for real games. *)
+    box) and the model to copy for real games. {!Moving_puzzle} is a
+    slider-puzzle captcha: drag a shape into a matching slot. *)
 
+module Moving_puzzle = Moving_puzzle
 module Placeholder_game = Placeholder_game
