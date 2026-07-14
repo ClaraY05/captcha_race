@@ -6,8 +6,8 @@
     so that animated mini-games keep moving between input events. Input and
     rendering run at different rates: input is polled every {!poll_interval}
     (~1ms) and each poll immediately produces an {!Captcha_race.Input.t} and
-    runs the pure transitions in {!Captcha_race.App_state}, while
-    {!Captcha_race.Render} draws only every {!frame_duration} (~60fps).
+    runs the pure transitions in {!Captcha_race_app.App_state}, while
+    {!Captcha_race_app.Render} draws only every {!frame_duration} (~60fps).
 
     Polling far faster than we draw is what makes fast clicking work. The
     [Graphics] poll reports whether the button is down {e right now} — clicks
@@ -23,10 +23,14 @@
     This file (plus [Render] and each game's [draw]) is the only place
     [Graphics] is touched; everything else is display-free and covered by
     expect tests. To add a mini-game, implement
-    {!Captcha_race.Mini_game_intf.S} and add it to [pool] below. *)
+    {!Captcha_race_engine.Mini_game_intf.S} in the [captcha_race.mini_games]
+    library and add it to [pool] below. *)
 
 open! Core
 open Captcha_race
+open Captcha_race_engine
+open Captcha_race_app
+open Captcha_race_mini_games
 
 (* The mini-games a race can be built from. Register new games here. *)
 let pool =
@@ -95,8 +99,7 @@ let step (model : App_state.Model.t) ~input ~random ~now ~elapsed =
 let () =
   (match
      Graphics.open_graph
-       [%string
-         " %{App_state.window_width#Int}x%{App_state.window_height#Int}"]
+       [%string " %{Layout.window_width#Int}x%{Layout.window_height#Int}"]
    with
    | () -> ()
    | exception Graphics.Graphic_failure message ->

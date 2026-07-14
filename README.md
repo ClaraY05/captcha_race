@@ -30,11 +30,11 @@ server); `xvfb-run -a dune exec bin/main.exe` works for smoke tests.
 
 ## Adding a mini-game
 
-Mini-games are pluggable. Implement
-`Captcha_race.Mini_game_intf.S` (copy
-`lib/captcha_race/src/placeholder_game.ml` as a starting point),
-re-export the module from `captcha_race.ml`/`.mli`, and register it in
-the pool in `bin/main.ml`:
+Mini-games are pluggable and live in their own library, `mini_games/`.
+Implement `Captcha_race_engine.Mini_game_intf.S` (copy
+`mini_games/src/placeholder_game.ml` as a starting point), re-export the
+module from `captcha_race_mini_games.ml`/`.mli`, and register it in the
+pool in `bin/main.ml`:
 
 ```ocaml
 let pool =
@@ -57,9 +57,10 @@ dune fmt --auto-promote         # format (.ocamlformat: janestreet profile)
 ```
 
 All game logic (sequencing, timing, leaderboard, hit-testing) is pure
-and covered by expect tests in `lib/captcha_race/test/`; only
-`Render` and `bin/main.ml` touch the display, and no test ever opens
-one.
+and covered by expect tests; only `Render`, each mini-game's `draw`,
+and `bin/main.ml` touch the display, and no test ever opens one. The
+`captcha_race` and `engine` libraries have no `graphics` dependency at
+all.
 
 ## GitHub Actions
 
@@ -74,12 +75,18 @@ one.
 
 ## Layout
 
+Only the shared type definitions live in `lib/`; each higher-level
+concern is its own top-level directory.
+
 ```
-lib/captcha_race/src/    the game library (state machine, runner,
-                         mini-game interface, leaderboard, render)
-lib/captcha_race/test/   headless expect tests
-bin/main.ml              the executable: window + event loop
+lib/          shared types, no Graphics (Geometry, Input)
+engine/       gameplay logic (game runner, mini-game interface,
+              leaderboard, layout)
+app/          view state machine, buttons, rendering
+mini_games/   concrete captchas (Placeholder_game, and yours)
+bin/main.ml   the executable: window + event loop
 ```
 
+Each library directory has `src/` and headless `test/` subdirectories.
 See `CLAUDE.md` for the architecture, the mini-game contract, and the
 full code conventions.
