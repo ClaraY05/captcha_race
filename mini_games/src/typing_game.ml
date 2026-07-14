@@ -64,6 +64,22 @@ module Dictionary = struct
   let choose ~random = words.(Random.State.int random (Array.length words))
 end
 
+(* The word is set in the game's chunky display face rather than the small
+   [Graphics] font. A 13px letter has no room to be distorted: any drift or
+   noise that is strong enough to obscure it also destroys it, leaving
+   nothing for the player to read. A blocky letter three times that size
+   takes a beating and is still a letter, which is what makes reading the
+   smear early a skill rather than a guess. *)
+module Pixel_font = Captcha_race_engine.Pixel_font
+
+(* Pixels per font cell: the word is drawn at [Pixel_font.cell_w] x
+   [Pixel_font.cell_h] cells of this size, i.e. 15x21 pixels a letter. *)
+let glyph_scale = 3
+
+(* One blank cell between letters, as {!Pixel_font.width} lays them out. *)
+let letter_advance = (Pixel_font.cell_w + 1) * glyph_scale
+let glyph_h = Pixel_font.cell_h * glyph_scale
+
 (* The distorted word and the noise on top of it are both drawn from the
    injected [Random.State.t] once, at [create], and then merely {e scaled} by
    the current distortion in [draw]. Rolling fresh randomness every frame
@@ -86,16 +102,16 @@ module Glyph = struct
   (* Vertical drift is the big one — a letter thrown a full line off the
      baseline stops reading as part of the word at all. It is bounded so the
      tallest drift still sits inside {!Layout.word_area}. *)
-  let max_drift_x = 11
-  let max_drift_y = 20
-  let max_smear = 7
+  let max_drift_x = 3
+  let max_drift_y = 8
+  let max_smear = 3
 
   (* How far the letters pile onto each other at full distortion: each
      advance is cut by this fraction, so neighbouring glyphs overlap and the
      word loses its letter boundaries. Collapsing the spacing is what makes
      the word unreadable even when a player can make out the individual
      shapes. *)
-  let max_crowding = 0.4
+  let max_crowding = 0.12
 
   let generate ~random =
     let between bound = Random.State.int_incl random (-bound) bound in
@@ -130,7 +146,7 @@ module Speck = struct
     }
   [@@deriving sexp_of]
 
-  let count = 560
+  let count = 300
   let max_size = 3
 
   let generate ~random ~(area : Geometry.Rect.t) =
@@ -157,7 +173,7 @@ module Strike = struct
     }
   [@@deriving sexp_of]
 
-  let count = 11
+  let count = 7
 
   let generate ~random ~(area : Geometry.Rect.t) =
     let y () = Random.State.int_incl random area.y (area.y + area.h) in
@@ -227,10 +243,11 @@ module Layout = struct
     }
   ;;
 
-  (* The baseline the letters resolve onto, centred in the band. *)
+  (* The bottom of the letters once they have resolved, so that a glyph box
+     sits centred in the band. *)
   let baseline_y bounds =
     let area = word_area bounds in
-    area.y + (area.h / 2) - 6
+    area.y + ((area.h - glyph_h) / 2)
   ;;
 end
 
@@ -380,43 +397,50 @@ let draw_string_at string ~(at : Geometry.Point.t) ~color =
 
 let scale offset ~by = Float.iround_nearest_exn (Float.of_int offset *. by)
 
-(* The word itself: each letter on its baseline, pushed off it by its own
-   drift, with a dimmer smear copy trailing behind. Both offsets are scaled
-   by the distortion, so at 1.0 the letters are strewn across the band in a
-   blur and at 0.0 every copy has collapsed onto the baseline into plain
-   text.
+(* One blocky letter: {!Pixel_font} says where the lit pixels of the glyph
+   fall, and each becomes a filled square. The font is uppercase-only, so the
+   word is shown in capitals even though the player types it in lower case. *)
+let draw_letter char ~(at : Geometry.Point.t) ~color =
+  Graphics.set_color color;
+  Pixel_font.foreach_pixel
+    (String.of_char (Char.uppercase char))
+    ~scale:glyph_scale
+    ~x:at.x
+    ~y:at.y
+    ~f:(fun ~x ~y ~size -> Graphics.fill_rect x y size size)
+;;
 
-   Letters are placed by measuring each one ([Graphics] can neither rotate
-   nor scale text, so displacement and overdraw are the whole distortion
-   budget) — the default font is not monospaced, and assuming a character
-   width made the word visibly lopsided. *)
+(* The word itself: each letter on its baseline, pushed off it by its own
+   drift, with a smear copy either side of it. Every offset is scaled by the
+   distortion, so at 1.0 the letters are strewn across the band in a blur,
+   and at 0.0 each has collapsed onto the baseline into plain, evenly spaced
+   text. *)
 let draw_word t =
-  (* Crowding shortens every advance, so the word is narrower than
-     [text_size] reports and has to be re-centred on the crowded width. *)
+  (* Crowding shortens every advance, so the word is narrower than its
+     resolved width and has to be re-centred on the crowded one. *)
   let crowding = 1.0 -. (Glyph.max_crowding *. t.distortion) in
-  let word_w, (_ : int) = Graphics.text_size t.word in
+  let advance = scale letter_advance ~by:crowding in
+  let letter_w = Pixel_font.cell_w * glyph_scale in
+  let word_w = (advance * (String.length t.word - 1)) + letter_w in
   let baseline_y = Layout.baseline_y t.bounds in
   let center = Geometry.Rect.center t.bounds in
-  let pen_x = ref (center.x - (scale word_w ~by:crowding / 2)) in
+  let left = center.x - (word_w / 2) in
   String.iteri t.word ~f:(fun index char ->
-    let letter = String.of_char char in
-    let letter_w, (_ : int) = Graphics.text_size letter in
     let { Glyph.drift; smear } = t.glyphs.(index) in
-    let x = !pen_x + scale drift.x ~by:t.distortion in
+    let x = left + (index * advance) + scale drift.x ~by:t.distortion in
     let y = baseline_y + scale drift.y ~by:t.distortion in
     (* The smear trails the letter on both sides — one copy either way, so a
        glyph at full distortion is a three-deep blur with no obvious middle. *)
     let smear_color = fade c_ink ~by:(0.45 -. (t.distortion *. 0.2)) in
     List.iter [ 1; -1 ] ~f:(fun direction ->
-      draw_string_at
-        letter
+      draw_letter
+        char
         ~at:
           { x = x + scale (smear.x * direction) ~by:t.distortion
           ; y = y + scale (smear.y * direction) ~by:t.distortion
           }
         ~color:smear_color);
-    draw_string_at letter ~at:{ x; y } ~color:c_ink;
-    pen_x := !pen_x + scale letter_w ~by:crowding)
+    draw_letter char ~at:{ x; y } ~color:c_ink)
 ;;
 
 (* Everything laid over the word: ruled lines and specks, each drawn only

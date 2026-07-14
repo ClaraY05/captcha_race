@@ -44,6 +44,12 @@ is fully covered by headless tests.
 - `Layout` — window size and `play_bounds` (the drawable region handed
   to every game's `create`). Lives here, not in the app, so game logic
   and tests can reference `play_bounds` without depending on rendering.
+- `Pixel_font` — the chunky 5x7 display face (a Press Start 2P
+  stand-in) as pure geometry: it says *where* a string's lit pixels
+  fall and leaves the drawing to its caller, so it needs no `Graphics`.
+  Lives here, not in the app, because both the app's chrome and the
+  mini-games' own text are set in it, and `engine` is the only layer
+  both can see.
 
 **`app/`** — `captcha_race.app`, module `Captcha_race_app`. The
 application/UI layer; depends on `captcha_race` + `engine` + `graphics`.

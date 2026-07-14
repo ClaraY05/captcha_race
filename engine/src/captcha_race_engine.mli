@@ -14,6 +14,11 @@
       to disk as a sexp file.
     - {!Layout} is the shared play-area geometry handed to every game's
       [create].
+    - {!Pixel_font} is the pure bitmap display face (a Press Start 2P
+      stand-in): it computes {e where} a string's lit pixels fall, and leaves
+      the drawing to its caller. It lives here rather than in the app because
+      both the app's chrome and the mini-games' own text are set in it, and
+      only this layer is visible to both.
 
     Nothing here touches [Graphics], so the whole library is exercised by
     headless expect tests. The rendering and window/event loop live in the
@@ -24,3 +29,4 @@ module Layout = Layout
 module Leaderboard = Leaderboard
 module Mini_game = Mini_game
 module Mini_game_intf = Mini_game_intf
+module Pixel_font = Pixel_font

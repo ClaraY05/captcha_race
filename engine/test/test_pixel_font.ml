@@ -1,5 +1,5 @@
 open! Core
-open Captcha_race_app
+open Captcha_race_engine
 
 (* Render [s] at scale 1 into ASCII art so the bitmap is legible in the
    expect output. The font's origin is bottom-left, so rows are flipped for
