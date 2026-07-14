@@ -28,7 +28,10 @@ module Operator = struct
   ;;
 end
 
-module Problem = struct
+module Term = struct
+  (* The multiplicative half of a problem. It binds tighter than the [+]/[-]
+     around it, and that precedence is the whole point: [20 - 3 x 5] comes to
+     5, not to 85. A single-operator problem could not ask that. *)
   type t =
     { left : int
     ; operator : Operator.t
@@ -36,83 +39,149 @@ module Problem = struct
     }
   [@@deriving sexp_of]
 
-  (* Derived rather than stored, so it cannot drift out of sync with the
-     problem the player is looking at. *)
-  let answer { left; operator; right } = Operator.apply operator ~left ~right
+  let value { left; operator; right } = Operator.apply operator ~left ~right
 
   let to_string { left; operator; right } =
-    [%string "%{left#Int} %{Operator.symbol operator} %{right#Int} = ?"]
+    [%string "%{left#Int} %{Operator.symbol operator} %{right#Int}"]
+  ;;
+
+  let min_factor = 2
+  let max_factor = 9
+
+  (* Keeps [number - term] (the widest case) to two digits. *)
+  let max_value = 60
+
+  (* Every tidy [b x c] and [b / c]: factors in [2, 9] so both stay inside
+     the times table, division exact by construction, and no product so large
+     that the [+]/[-] step needs a three-digit number. Enumerated once, at
+     module init, rather than sampled and rejected. *)
+  let all =
+    let factors = List.range min_factor max_factor ~stop:`inclusive in
+    let products =
+      List.concat_map factors ~f:(fun left ->
+        List.filter_map factors ~f:(fun right ->
+          match left * right <= max_value with
+          | false -> None
+          | true -> Some { left; operator = Operator.Multiply; right }))
+    in
+    (* Built from the quotient outwards, so the division always comes out
+       even: [quotient * divisor / divisor]. *)
+    let quotients =
+      List.concat_map factors ~f:(fun quotient ->
+        List.map factors ~f:(fun divisor ->
+          { left = quotient * divisor
+          ; operator = Operator.Divide
+          ; right = divisor
+          }))
+    in
+    products @ quotients
+  ;;
+end
+
+module Problem = struct
+  module Shape = struct
+    (* Where the loose number sits relative to the term. Both orders appear
+       so the player cannot just evaluate left to right and be right by luck. *)
+    type t =
+      | Term_first (* 7 x 3 - 6 *)
+      | Number_first (* 20 - 3 x 5 *)
+    [@@deriving sexp_of]
+  end
+
+  type t =
+    { term : Term.t
+    ; add_operator : Operator.t (* always [Add] or [Subtract] *)
+    ; number : int
+    ; shape : Shape.t
+    }
+  [@@deriving sexp_of]
+
+  (* Derived rather than stored, so it cannot drift out of sync with the
+     problem the player is looking at. Mirrors the precedence the player is
+     expected to apply: the term resolves first. *)
+  let answer { term; add_operator; number; shape } =
+    let term = Term.value term in
+    match shape with
+    | Term_first -> Operator.apply add_operator ~left:term ~right:number
+    | Number_first -> Operator.apply add_operator ~left:number ~right:term
+  ;;
+
+  let to_string { term; add_operator; number; shape } =
+    let term = Term.to_string term in
+    let symbol = Operator.symbol add_operator in
+    match shape with
+    | Term_first -> [%string "%{term} %{symbol} %{number#Int} = ?"]
+    | Number_first -> [%string "%{number#Int} %{symbol} %{term} = ?"]
   ;;
 
   let min_answer = 1
   let max_answer = 20
-  let max_factor = 10
-  let max_subtrahend = 9
-  let max_divisor = 9
+  let max_number = 99
 
-  (* Keeps division to two digits over one: [96 / 6] is a fair thing to ask
-     under time pressure, [171 / 9] is not. *)
-  let max_dividend = 99
+  (* Every two-step problem that evaluates to [answer], built by construction
+     rather than by guessing and retrying: for each term, solve the [+]/[-]
+     step for the one number that lands on [answer], and keep it if that
+     number is a sane positive int.
 
-  (* Ways to write [answer] as a product of two factors in [2, max_factor],
-     so a multiplication never degenerates into "1 x 17" or asks for an
-     operand nobody knows the times table for. Empty for primes, which is why
-     the operator is chosen after the answer. *)
-  let factor_pairs answer =
-    List.filter_map
-      (List.range 2 max_factor ~stop:`inclusive)
-      ~f:(fun left ->
-        match answer % left = 0 with
-        | false -> None
-        | true ->
-          let right = answer / left in
-          (match right >= 2 && right <= max_factor with
-           | true -> Some (left, right)
-           | false -> None))
+     Never empty — [number - term] is always available, since
+     [answer + Term.max_value] can never exceed [max_number]. *)
+  let candidates ~answer =
+    List.concat_map Term.all ~f:(fun term ->
+      let value = Term.value term in
+      let sum = answer - value in
+      let difference = value - answer in
+      let minuend = answer + value in
+      List.filter_opt
+        [ (* term + number *)
+          (match sum >= 1 with
+           | false -> None
+           | true ->
+             Some
+               { term
+               ; add_operator = Operator.Add
+               ; number = sum
+               ; shape = Shape.Term_first
+               })
+        ; (* number + term *)
+          (match sum >= 1 with
+           | false -> None
+           | true ->
+             Some
+               { term
+               ; add_operator = Operator.Add
+               ; number = sum
+               ; shape = Shape.Number_first
+               })
+        ; (* term - number *)
+          (match difference >= 1 with
+           | false -> None
+           | true ->
+             Some
+               { term
+               ; add_operator = Operator.Subtract
+               ; number = difference
+               ; shape = Shape.Term_first
+               })
+        ; (* number - term *)
+          (match minuend <= max_number with
+           | false -> None
+           | true ->
+             Some
+               { term
+               ; add_operator = Operator.Subtract
+               ; number = minuend
+               ; shape = Shape.Number_first
+               })
+        ])
   ;;
 
-  (* Pick the answer first, then work backwards to operands that produce it.
-     That makes "the answer is in [1, 20]" true by construction instead of by
-     a rejection loop, and keeps every operand a small positive int. *)
+  (* Pick the answer first, then a problem that reaches it. That makes "the
+     answer is in [1, 20]" true by construction — which matters for more than
+     the arithmetic, since the answer is also how many times the player has
+     to click the checkbox in phase two. *)
   let generate ~random =
     let answer = Random.State.int_incl random min_answer max_answer in
-    let factors = factor_pairs answer in
-    let operators =
-      List.concat
-        [ (* 1 is not the sum of two positive ints. *)
-          (match answer >= 2 with true -> [ Operator.Add ] | false -> [])
-        ; [ Operator.Subtract ]
-        ; (match List.is_empty factors with
-           | true -> []
-           | false -> [ Operator.Multiply ])
-        ; [ Operator.Divide ]
-        ]
-    in
-    let operator = List.random_element_exn ~random_state:random operators in
-    match operator with
-    | Add ->
-      let left = Random.State.int_incl random 1 (answer - 1) in
-      { left; operator; right = answer - left }
-    | Subtract ->
-      let right = Random.State.int_incl random 1 max_subtrahend in
-      { left = answer + right; operator; right }
-    | Multiply ->
-      let left, right =
-        List.random_element_exn ~random_state:random factors
-      in
-      { left; operator; right }
-    | Divide ->
-      (* The mirror of [Multiply]: choose the divisor, then multiply up, so
-         the division is always exact. Divisors that would push the dividend
-         past two digits are dropped, and a divisor of 2 always survives:
-         even the largest answer only makes a dividend of 40. *)
-      let right =
-        Random.State.int_incl
-          random
-          2
-          (Int.min max_divisor (max_dividend / answer))
-      in
-      { left = answer * right; operator; right }
+    List.random_element_exn ~random_state:random (candidates ~answer)
   ;;
 end
 
@@ -216,8 +285,10 @@ let is_solved t =
    full, so two digits is the whole field. *)
 let max_digits = 2
 
-(* Long enough to see, short enough that it is gone before the next click. *)
-let fill_duration = Time_ns.Span.of_int_ms 400
+(* A blink, not a state: the check must be gone well before the next click
+   lands, so a fast run reads as a string of distinct flashes rather than one
+   long fill. Two rendered frames is enough to be seen. *)
+let fill_duration = Time_ns.Span.of_int_ms 100
 
 let apply_key typed key =
   match key with
@@ -464,7 +535,23 @@ let draw t =
 module For_testing = struct
   let answer t = Problem.answer t.problem
   let problem t = Problem.to_string t.problem
-  let operands t = t.problem.left, t.problem.right
+
+  let numbers t =
+    let { Problem.term; add_operator = (_ : Operator.t); number; shape } =
+      t.problem
+    in
+    match shape with
+    | Term_first -> [ term.left; term.right; number ]
+    | Number_first -> [ number; term.left; term.right ]
+  ;;
+
+  let division t =
+    let { Term.left; operator; right } = t.problem.term in
+    match operator with
+    | Divide -> Some (left, right)
+    | Add | Subtract | Multiply -> None
+  ;;
+
   let enter_button t = Layout.enter_button t.bounds
   let checkbox t = Layout.checkbox t.bounds
 end
