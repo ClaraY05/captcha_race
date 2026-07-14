@@ -1,0 +1,6 @@
+(library
+ (name captcha_race_test)
+ (libraries captcha_race core expect_test_helpers_core)
+ (inline_tests)
+ (preprocess
+  (pps ppx_jane)))

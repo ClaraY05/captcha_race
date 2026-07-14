@@ -1,0 +1,6 @@
+(library
+ (name captcha_race_mini_games)
+ (public_name captcha_race.mini_games)
+ (libraries core captcha_race captcha_race_engine graphics)
+ (preprocess
+  (pps ppx_jane)))

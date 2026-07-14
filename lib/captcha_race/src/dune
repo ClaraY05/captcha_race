@@ -1,6 +1,0 @@
-(library
- (name captcha_race)
- (public_name captcha_race)
- (libraries core core_unix.sys_unix graphics)
- (preprocess
-  (pps ppx_jane)))

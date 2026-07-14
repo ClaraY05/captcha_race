@@ -15,13 +15,24 @@ three views: **menu** (Play / Leaderboard), **leaderboard**, and
 
 ## Architecture
 
-The library lives in `lib/captcha_race/src/`; `Captcha_race.*` below.
+The code is split into four libraries by concern, plus the executable —
+each in its own top-level directory (dune discovers them anywhere, they
+need not sit under `lib/`). Each is a dune-wrapped library:
+`open Captcha_race` (etc.) brings its modules into scope. Only `lib/`
+holds general type definitions; everything else is a higher-level layer.
 
-- `App_state` — the three-view state machine
-  (`Menu | Leaderboard | Playing of Game_runner.t`), plus
-  `Model` (view + leaderboard), pure transitions, and the per-view
-  button layout. All layout constants (window size, `play_bounds`,
-  `games_per_run`) live here.
+**`lib/`** — `captcha_race`, module `Captcha_race`. The shared type
+definitions, with **no dependencies** (core only, no `Graphics`, no
+I/O). This is the foundation every other layer builds on.
+
+- `Geometry` — pixel coordinates (`Point`) and rectangles (`Rect`) with
+  hit-testing.
+- `Input` — a per-frame snapshot of the player's pointer and keyboard.
+
+**`engine/`** — `captcha_race.engine`, module `Captcha_race_engine`.
+The gameplay logic; depends on `captcha_race`, **no `Graphics`**, so it
+is fully covered by headless tests.
+
 - `Game_runner` — one race: samples 10 games from a pool with an
   injected `Random.State.t`, runs them sequentially, and reports
   `` `Finished total `` when the last one solves.
@@ -29,15 +40,38 @@ The library lives in `lib/captcha_race/src/`; `Captcha_race.*` below.
 - `Mini_game` — existentially packs any `S` into a uniform `t`
   (`pack`, `name`, `update`, `draw`, `is_solved`); a race pool is a
   `Mini_game.factory list`.
-- `Placeholder_game` — the trivial reference mini-game (click the box).
 - `Leaderboard` — completion times, fastest-first, sexp `load`/`save`.
-- `Geometry`, `Input`, `Button` — pure layout, per-frame input
-  snapshots, click hit-testing.
+- `Layout` — window size and `play_bounds` (the drawable region handed
+  to every game's `create`). Lives here, not in the app, so game logic
+  and tests can reference `play_bounds` without depending on rendering.
+
+**`app/`** — `captcha_race.app`, module `Captcha_race_app`. The
+application/UI layer; depends on `captcha_race` + `engine` + `graphics`.
+
+- `App_state` — the three-view state machine
+  (`Menu | Leaderboard | Playing of Game_runner.t`), plus `Model`
+  (view + leaderboard), pure transitions, and the per-view button
+  layout (`games_per_run` lives here; window/`play_bounds` in
+  `Layout`).
+- `Button` — a clickable labeled region + hit-testing.
 - `Render` — the ONLY library module that issues `Graphics` drawing
   calls (mini-games draw themselves, but only from here).
-- `bin/main.ml` — owns the window and the non-blocking ~60 fps event
-  loop; polls input, runs pure transitions, draws, saves the
-  leaderboard when it changes.
+
+**`mini_games/`** — `captcha_race.mini_games`, module
+`Captcha_race_mini_games`. The concrete captchas; depends on
+`captcha_race` + `engine` + `graphics`.
+
+- `Placeholder_game` — the trivial reference mini-game (click the box);
+  the model to copy for real games.
+
+**`bin/main.ml`** — owns the window and the non-blocking ~60 fps event
+loop; assembles the mini-game pool, polls input, runs pure transitions,
+draws, and saves the leaderboard when it changes. Depends on all four
+libraries (it's where they meet).
+
+Dependency direction: everything builds on `captcha_race`; then
+`mini_games → engine ← app`, and `bin → all`. The app never depends on
+concrete mini-games — the pool is injected in `bin/main.ml`.
 
 Data flow: event loop → `Input.t` → `App_state.advance` /
 `apply_action` → `Game_runner.advance` → active mini-game's `update` →
@@ -45,15 +79,16 @@ on finish, `Leaderboard.add` + save.
 
 ## Adding a mini-game
 
-1. Create `lib/captcha_race/src/<my_game>.ml/.mli` implementing
-   `Mini_game_intf.S` (`Placeholder_game` is the model to copy):
-   abstract `type t [@@deriving sexp_of]`, `name`, `create`, `update`,
-   `draw`, `is_solved`.
-2. Re-export it from `captcha_race.ml`/`.mli`.
+1. Create `mini_games/src/<my_game>.ml/.mli` implementing
+   `Captcha_race_engine.Mini_game_intf.S` (`Placeholder_game` is the
+   model to copy): `open Captcha_race` and `open Captcha_race_engine`,
+   then an abstract `type t [@@deriving sexp_of]`, `name`, `create`,
+   `update`, `draw`, `is_solved`.
+2. Re-export it from `captcha_race_mini_games.ml`/`.mli`.
 3. Register it in the pool in `bin/main.ml`:
    `Mini_game.pack (module My_game)`.
-4. Add `lib/captcha_race/test/test_<my_game>.ml` driving it with
-   synthetic `Input.t` values.
+4. Add `mini_games/test/test_<my_game>.ml` driving it with synthetic
+   `Input.t` values.
 
 Invariants for every mini-game:
 
@@ -63,7 +98,7 @@ Invariants for every mini-game:
   from the injected `~now`/`~elapsed`. Never call `Time_ns.now ()` or
   use global random state inside a game.
 - Stay inside the `~bounds` rect passed to `create`
-  (`App_state.play_bounds`).
+  (`Layout.play_bounds`).
 
 ## Headless rule (CI has no X server)
 
@@ -72,8 +107,9 @@ without one. CI runs `dune runtest` on a headless runner, therefore:
 
 - Tests must never open a display or call any drawing function
   (including a game's `draw`).
-- Only `Render` and `bin/main.ml` may touch `Graphics` drawing/event
-  functions.
+- Only `Render`, each mini-game's `draw`, and `bin/main.ml` may touch
+  `Graphics`. That is exactly why `captcha_race` and `engine` have no
+  `graphics` dependency — they link and test without an X server.
 - To play locally you need a display; on a headless box use
   `xvfb-run -a dune exec bin/main.exe` just to smoke-test startup.
 
@@ -223,11 +259,20 @@ dune discovers libraries automatically as long as they have a `dune` file.
 
 ## Project layout
 
+Only general type definitions live in `lib/`; each higher-level concern
+is its own top-level directory (dune finds `dune` files anywhere).
+
 ```
-lib/
-  captcha_race/
-    src/     the game library (see Architecture above)
-    test/    headless expect tests for it
+lib/            shared type definitions: Geometry, Input (no Graphics)
+  src/ test/
+engine/         gameplay logic: runner, mini-game interface,
+  src/ test/    leaderboard, layout (depends on captcha_race)
+app/            view state machine + rendering
+  src/ test/    (depends on captcha_race + engine)
+mini_games/     concrete captchas
+  src/ test/    (depends on captcha_race + engine)
 bin/
-  main.ml    the game executable: window + event loop
+  main.ml       the game executable: window + event loop
 ```
+
+See Architecture above for what each library contains.
