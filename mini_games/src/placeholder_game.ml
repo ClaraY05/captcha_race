@@ -33,13 +33,24 @@ let update t ~(input : Input.t) ~elapsed:(_ : Time_ns.Span.t) =
 
 let draw t =
   let { Geometry.Rect.x; y; w; h } = t.target in
-  Graphics.set_color (Graphics.rgb 235 235 235);
+  (* A recessed field on the captcha card: light fill with an inset shadow
+     along the top-left, an accent check box, and dark ink label — matching
+     the flat pixel palette [Render] draws the rest of the card in. *)
+  Graphics.set_color (Graphics.rgb 217 212 200);
   Graphics.fill_rect x y w h;
-  Graphics.set_color Graphics.black;
-  Graphics.draw_rect x y w h;
-  let label = "[ ] I am not a robot" in
-  let text_w, text_h = Graphics.text_size label in
-  Graphics.moveto (x + ((w - text_w) / 2)) (y + ((h - text_h) / 2));
+  Graphics.set_color (Graphics.rgb 195 188 171);
+  Graphics.fill_rect x (y + h - 3) w 3;
+  Graphics.fill_rect x y 3 h;
+  let box = 20 in
+  let box_x = x + 14 in
+  let box_y = y + ((h - box) / 2) in
+  Graphics.set_color (Graphics.rgb 203 171 99);
+  Graphics.fill_rect box_x box_y box box;
+  Graphics.set_color (Graphics.rgb 38 36 31);
+  Graphics.draw_rect box_x box_y box box;
+  let label = "I am not a robot" in
+  let (_ : int), text_h = Graphics.text_size label in
+  Graphics.moveto (box_x + box + 12) (y + ((h - text_h) / 2));
   Graphics.draw_string label
 ;;
 

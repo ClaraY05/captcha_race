@@ -25,47 +25,36 @@ module Model = struct
 end
 
 let games_per_run = 10
-let menu_button_w = 200
-let menu_button_h = 50
-let menu_button_x = (Layout.window_width - menu_button_w) / 2
 
+(* Button rectangles are laid out inside {!Layout.screen}; {!Render} draws
+   exactly these, so hit-testing and pixels can never disagree. The button's
+   visual style (primary / ghost / quit) is inferred from its [action] in
+   [Render], so no style lives here. *)
 let buttons view =
   match view with
   | Menu ->
-    [ { Button.label = "Play"
-      ; rect =
-          { x = menu_button_x
-          ; y = 320
-          ; w = menu_button_w
-          ; h = menu_button_h
-          }
+    [ { Button.label = "PLAY"
+      ; rect = { x = 290; y = 350; w = 220; h = 44 }
       ; action = Action.Play
       }
-    ; { label = "Leaderboard"
-      ; rect =
-          { x = menu_button_x
-          ; y = 240
-          ; w = menu_button_w
-          ; h = menu_button_h
-          }
+    ; { label = "LEADERBOARD"
+      ; rect = { x = 290; y = 292; w = 220; h = 44 }
       ; action = View_leaderboard
       }
     ]
   | Leaderboard ->
-    [ { Button.label = "Back"
-      ; rect =
-          { x = menu_button_x; y = 60; w = menu_button_w; h = menu_button_h }
-      ; action = Action.Back_to_menu
+    [ { Button.label = "PLAY AGAIN"
+      ; rect = { x = 180; y = 200; w = 205; h = 40 }
+      ; action = Action.Play
+      }
+    ; { label = "MENU"
+      ; rect = { x = 405; y = 200; w = 125; h = 40 }
+      ; action = Back_to_menu
       }
     ]
   | Playing (_ : Game_runner.t) ->
-    [ { Button.label = "Quit"
-      ; rect =
-          { x = Layout.window_width - 110
-          ; y = Layout.window_height - 50
-          ; w = 100
-          ; h = 40
-          }
+    [ { Button.label = "QUIT"
+      ; rect = { x = 582; y = 494; w = 72; h = 26 }
       ; action = Action.Quit_run
       }
     ]
