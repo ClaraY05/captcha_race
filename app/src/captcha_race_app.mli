@@ -11,6 +11,8 @@
     - {!Click_ripple} is the expanding ring every click leaves, whatever it
       landed on; {!App_state.Model} carries the latest one and {!Render}
       draws it on top.
+    - {!Pixel_font} is the pure bitmap display font (Press Start 2P stand-in)
+      {!Render} draws titles, HUD labels, buttons, and ranks with.
 
     Built on top of {!Captcha_race_engine}; the concrete mini-games it runs
     are supplied as a pool from [bin/main.ml], so this library stays
@@ -20,4 +22,5 @@
 module App_state = App_state
 module Button = Button
 module Click_ripple = Click_ripple
+module Pixel_font = Pixel_font
 module Render = Render

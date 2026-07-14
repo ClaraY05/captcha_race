@@ -7,9 +7,11 @@
 
     {!Placeholder_game} is the trivial reference implementation (click the
     box) and the model to copy for real games. {!Math_game} is the two-phase
-    arithmetic captcha, and {!Typing_game} the distorted word that resolves
-    as the clock runs. *)
+    arithmetic captcha. {!Moving_puzzle} is a slider-puzzle captcha: drag a
+    shape into a matching slot. {!Typing_game} is the distorted word that
+    resolves as the clock runs. *)
 
 module Math_game = Math_game
+module Moving_puzzle = Moving_puzzle
 module Placeholder_game = Placeholder_game
 module Typing_game = Typing_game
