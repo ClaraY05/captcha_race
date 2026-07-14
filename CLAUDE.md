@@ -67,6 +67,8 @@ application/UI layer; depends on `captcha_race` + `engine` + `graphics`.
   the model to copy for real games.
 - `Math_game` — solve an arithmetic problem, then click the reCAPTCHA
   checkbox that many times (the problem is gone by then).
+- `Typing_game` — read a word that starts as an illegible smear and
+  resolves over 20 seconds, and type it into the field.
 
 **`bin/main.ml`** — owns the window and the non-blocking event loop;
 assembles the mini-game pool, polls input, runs pure transitions, draws,
