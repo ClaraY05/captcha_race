@@ -1,0 +1,12 @@
+(executable
+ (name shot)
+ (libraries
+  captcha_race
+  captcha_race_engine
+  captcha_race_app
+  captcha_race_mini_games
+  core
+  core_unix
+  graphics)
+ (preprocess
+  (pps ppx_jane)))
