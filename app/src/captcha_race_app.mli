@@ -8,6 +8,9 @@
       buttons per view so rendering and hit-testing agree.
     - {!Render} turns a model into pixels — the only module here that issues
       [Graphics] calls.
+    - {!Click_ripple} is the expanding ring every click leaves, whatever it
+      landed on; {!App_state.Model} carries the latest one and {!Render}
+      draws it on top.
 
     Built on top of {!Captcha_race_engine}; the concrete mini-games it runs
     are supplied as a pool from [bin/main.ml], so this library stays
@@ -16,4 +19,5 @@
 
 module App_state = App_state
 module Button = Button
+module Click_ripple = Click_ripple
 module Render = Render

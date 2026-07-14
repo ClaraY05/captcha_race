@@ -204,16 +204,23 @@ let draw_pips ~current ~count =
   done
 ;;
 
-let draw_card runner =
+(* The captcha card: [play_bounds] plus its padding and title bar. *)
+let card_rect : Geometry.Rect.t =
   let { Geometry.Rect.x = bx; y = by; w = bw; h = bh } =
     Layout.play_bounds
   in
   let pad = 16 in
   let header_h = 28 in
-  let x = bx - pad in
-  let w = bw + (2 * pad) in
-  let y = by - pad in
-  let h = bh + (2 * pad) + header_h in
+  { x = bx - pad
+  ; y = by - pad
+  ; w = bw + (2 * pad)
+  ; h = bh + (2 * pad) + header_h
+  }
+;;
+
+let draw_card runner =
+  let { Geometry.Rect.x; y; w; h } = card_rect in
+  let header_h = 28 in
   fill c_card_shadow ~x:(x + 4) ~y:(y - 4) ~w ~h;
   fill c_card ~x ~y ~w ~h;
   let hy = y + h - header_h in
@@ -283,6 +290,34 @@ let draw_leaderboard (model : App_state.Model.t) =
           (Time_ns.Span.to_string_hum ~decimals:2 entry.completion_time))
 ;;
 
+(* Drawn last, so it rides on top of buttons and mini-games alike: a click
+   anywhere is acknowledged, even one that lands on nothing. *)
+let draw_ripple ripple ~now =
+  match Click_ripple.radius ripple ~now with
+  | None -> ()
+  | Some radius ->
+    let center = Click_ripple.center ripple in
+    (* Accent gold reads on the dark screen but vanishes against the card —
+       whose own controls are accent gold. Ink is the reverse. Pick whichever
+       contrasts with what was clicked. *)
+    let color =
+      match Geometry.Rect.contains card_rect center with
+      | true -> c_ink
+      | false -> c_accent
+    in
+    (* [Graphics] has no alpha, so the ring thins as it grows to read as a
+       fade. *)
+    let width =
+      match radius * 2 <= Click_ripple.end_radius with
+      | true -> 3
+      | false -> 2
+    in
+    Graphics.set_color color;
+    Graphics.set_line_width width;
+    Graphics.draw_circle center.x center.y radius;
+    Graphics.set_line_width 1
+;;
+
 let draw (model : App_state.Model.t) ~now =
   draw_background ();
   draw_stand ();
@@ -291,5 +326,8 @@ let draw (model : App_state.Model.t) ~now =
    | Menu -> draw_menu model
    | Leaderboard -> draw_leaderboard model
    | Playing runner -> draw_playing runner ~now);
-  List.iter (App_state.buttons model.view) ~f:draw_button
+  List.iter (App_state.buttons model.view) ~f:draw_button;
+  match model.ripple with
+  | None -> ()
+  | Some ripple -> draw_ripple ripple ~now
 ;;

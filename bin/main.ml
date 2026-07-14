@@ -2,12 +2,23 @@
 
     Run with: dune exec bin/main.exe (needs a graphical display).
 
-    The loop is a non-blocking poll — roughly 60 frames per second — rather
-    than a blocking [wait_next_event], so that animated mini-games keep
-    moving between input events. Each frame: poll input into an
-    {!Captcha_race.Input.t}, run the pure transitions in
-    {!Captcha_race_app.App_state}, draw via {!Captcha_race_app.Render}, then
-    sleep off the rest of the frame.
+    The loop is a non-blocking poll rather than a blocking [wait_next_event],
+    so that animated mini-games keep moving between input events. Input and
+    rendering run at different rates: input is polled every {!poll_interval}
+    (~1ms) and each poll immediately produces an {!Captcha_race.Input.t} and
+    runs the pure transitions in {!Captcha_race_app.App_state}, while
+    {!Captcha_race_app.Render} draws only every {!frame_duration} (~60fps).
+
+    Polling far faster than we draw is what makes fast clicking work. The
+    [Graphics] poll reports whether the button is down {e right now} — clicks
+    are not queued — so a click is only seen if a poll happens to land
+    between the press and the release. At one poll per rendered frame, a
+    press and release inside the same 16ms would leave no trace at all, and a
+    player racing through a game that counts clicks would silently lose them.
+    A human click holds the button for tens of milliseconds, so sampling
+    every millisecond catches every one, and acts on it within a millisecond
+    rather than up to a frame later. Drawing is the expensive part, and it
+    stays at 60fps.
 
     This file (plus [Render] and each game's [draw]) is the only place
     [Graphics] is touched; everything else is display-free and covered by
@@ -22,7 +33,11 @@ open Captcha_race_app
 open Captcha_race_mini_games
 
 (* The mini-games a race can be built from. Register new games here. *)
-let pool = [ Mini_game.pack (module Placeholder_game) ]
+let pool =
+  [ Mini_game.pack (module Placeholder_game)
+  ; Mini_game.pack (module Math_game)
+  ]
+;;
 
 let leaderboard_path =
   match Sys.getenv "HOME" with
@@ -30,7 +45,13 @@ let leaderboard_path =
   | None -> ".captcha_race_scores.sexp"
 ;;
 
+(* How often the screen is redrawn: ~60fps. *)
 let frame_duration = Time_ns.Span.of_int_ms 16
+
+(* How often the mouse and keyboard are sampled. Far shorter than
+   [frame_duration] so that no click falls between two polls; see the header
+   comment. *)
+let poll_interval = Time_ns.Span.of_int_ms 1
 
 let load_leaderboard () =
   match Leaderboard.load ~path:leaderboard_path with
@@ -64,6 +85,7 @@ let poll_input ~prev_mouse_down =
 ;;
 
 let step (model : App_state.Model.t) ~input ~random ~now ~elapsed =
+  let model = App_state.record_click model ~input ~now in
   match
     ( input.Input.mouse_clicked
     , Button.hit_many (App_state.buttons model.view) input.Input.mouse )
@@ -88,10 +110,15 @@ let () =
   Graphics.auto_synchronize false;
   let random = Random.State.make_self_init () in
   let model =
-    ref { App_state.Model.view = Menu; leaderboard = load_leaderboard () }
+    ref
+      { App_state.Model.view = Menu
+      ; leaderboard = load_leaderboard ()
+      ; ripple = None
+      }
   in
   let prev_mouse_down = ref false in
-  let prev_frame = ref (Time_ns.now ()) in
+  let prev_poll = ref (Time_ns.now ()) in
+  let next_frame = ref (Time_ns.now ()) in
   (* The loop ends when the player closes the window, which surfaces as
      [Graphic_failure]. *)
   try
@@ -99,17 +126,23 @@ let () =
       let input = poll_input ~prev_mouse_down:!prev_mouse_down in
       prev_mouse_down := input.mouse_down;
       let now = Time_ns.now () in
-      let elapsed = Time_ns.diff now !prev_frame in
-      prev_frame := now;
+      let elapsed = Time_ns.diff now !prev_poll in
+      prev_poll := now;
       let previous = !model in
+      (* Every poll steps the model, so a click takes effect on the poll that
+         sees it — not at the next frame boundary. *)
       let next = step previous ~input ~random ~now ~elapsed in
       if not (phys_equal next.leaderboard previous.leaderboard)
       then save_leaderboard next.leaderboard;
       model := next;
-      Render.draw next ~now;
-      Graphics.synchronize ();
+      (match Time_ns.( >= ) now !next_frame with
+       | false -> ()
+       | true ->
+         Render.draw next ~now;
+         Graphics.synchronize ();
+         next_frame := Time_ns.add now frame_duration);
       ignore
-        (Core_unix.nanosleep (Time_ns.Span.to_sec frame_duration) : float)
+        (Core_unix.nanosleep (Time_ns.Span.to_sec poll_interval) : float)
     done
   with
   | Graphics.Graphic_failure (_ : string) -> ()
