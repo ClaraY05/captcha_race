@@ -1,11 +1,13 @@
 (** A captcha that starts unreadable and resolves as the clock runs.
 
     A word is drawn from a small dictionary and rendered {e wrecked}: every
-    letter is thrown off its baseline and trailed by a smear copy, decoy
-    letters are scattered around it, and lines and specks are ruled across
-    the whole band. The player types what they think the word is into the
-    field below and submits it with the [Enter] button or the Return key; a
-    wrong guess clears the field and lets them look again.
+    letter is thrown off its baseline, trailed by smear copies, and crowded
+    into its neighbours, with lines and specks ruled across the whole band.
+    The noise is letterless by design — the only letters anywhere on screen
+    are the word's own, so a player who can read part of the smear can trust
+    what they read. The player types their guess into the field below and
+    submits it with the [Enter] button or the Return key; a wrong guess
+    clears the field and lets them look again.
 
     The catch is time. The distortion decays from 1.0 to 0.0 over 20 seconds
     and every effect above is scaled by it, so the word slides steadily back

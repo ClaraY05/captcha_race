@@ -64,13 +64,13 @@ module Dictionary = struct
   let choose ~random = words.(Random.State.int random (Array.length words))
 end
 
-(* The distorted word, the noise on top of it, and the decoys around it are
-   all drawn from the injected [Random.State.t] once, at [create], and then
-   merely {e scaled} by the current distortion in [draw]. Rolling fresh
-   randomness every frame would make the word strobe, and would need an RNG
-   inside [update]; fixing the shape up front means the letters slide
-   steadily back onto their baseline as the distortion decays, which is the
-   effect we want — an illegible smear resolving into a word. *)
+(* The distorted word and the noise on top of it are both drawn from the
+   injected [Random.State.t] once, at [create], and then merely {e scaled} by
+   the current distortion in [draw]. Rolling fresh randomness every frame
+   would make the word strobe, and would need an RNG inside [update]; fixing
+   the shape up front means the letters slide steadily back onto their
+   baseline as the distortion decays, which is the effect we want — an
+   illegible smear resolving into a word. *)
 
 module Glyph = struct
   (* Where a letter sits at full distortion, relative to where it belongs.
@@ -130,7 +130,7 @@ module Speck = struct
     }
   [@@deriving sexp_of]
 
-  let count = 420
+  let count = 560
   let max_size = 3
 
   let generate ~random ~(area : Geometry.Rect.t) =
@@ -157,40 +157,13 @@ module Strike = struct
     }
   [@@deriving sexp_of]
 
-  let count = 8
+  let count = 11
 
   let generate ~random ~(area : Geometry.Rect.t) =
     let y () = Random.State.int_incl random area.y (area.y + area.h) in
     { from = { Geometry.Point.x = area.x; y = y () }
     ; to_ = { Geometry.Point.x = area.x + area.w; y = y () }
     ; threshold = Random.State.float random 1.0
-    }
-  ;;
-end
-
-module Decoy = struct
-  (* A stray letter scattered near the word: at full distortion the player
-     cannot tell which glyphs are the word and which are litter. These fade
-     first (their thresholds sit in the top half of the range), so the word
-     stops being ambiguous well before it stops being blurry. *)
-  type t =
-    { char : char
-    ; at : Geometry.Point.t
-    ; threshold : float
-    }
-  [@@deriving sexp_of]
-
-  let count = 14
-  let min_threshold = 0.45
-
-  let generate ~random ~(area : Geometry.Rect.t) =
-    { char = Char.of_int_exn (Random.State.int_incl random 97 122)
-    ; at =
-        { Geometry.Point.x =
-            Random.State.int_incl random area.x (area.x + area.w)
-        ; y = Random.State.int_incl random area.y (area.y + area.h)
-        }
-    ; threshold = Random.State.float_range random min_threshold 1.0
     }
   ;;
 end
@@ -202,7 +175,6 @@ type t =
   ; glyphs : Glyph.t array
   ; specks : Speck.t array
   ; strikes : Strike.t array
-  ; decoys : Decoy.t array
   ; distortion : float
   (** 1.0 at [create], falling to 0.0 over {!clear_after}; every distortion
       effect is scaled by it, so the word is unreadable at first and clean at
@@ -282,9 +254,6 @@ let create ~random ~bounds =
   ; strikes =
       Array.init Strike.count ~f:(fun (_ : int) ->
         Strike.generate ~random ~area)
-  ; decoys =
-      Array.init Decoy.count ~f:(fun (_ : int) ->
-        Decoy.generate ~random ~area)
   ; distortion = 1.0
   ; wrong_attempts = 0
   ; is_solved = false
@@ -450,23 +419,21 @@ let draw_word t =
     pen_x := !pen_x + scale letter_w ~by:crowding)
 ;;
 
-(* Everything laid over the word: decoy letters, ruled lines, and specks,
-   each drawn only while the distortion is still above its own threshold and
-   each dimming as it nears it. Drawn after the word, so at full distortion
-   they genuinely obscure it. *)
+(* Everything laid over the word: ruled lines and specks, each drawn only
+   while the distortion is still above its own threshold and each dimming as
+   it nears it. Drawn after the word, so at full distortion they genuinely
+   obscure it.
+
+   The noise is deliberately letterless. Scattering stray glyphs around the
+   word obscures it well, but it also puts letters on screen that are not in
+   the answer, and a player who has half-read the word cannot tell which of
+   them to type. Ink that is plainly not a letter takes nothing away from the
+   player's ability to trust what they can read. *)
 let draw_noise t =
   let is_showing threshold = Float.( < ) threshold t.distortion in
   (* Each piece of noise dims as the distortion closes in on its own
      threshold, so it thins away rather than blinking out. *)
   let nearness threshold = threshold /. t.distortion in
-  Array.iter t.decoys ~f:(fun { Decoy.char; at; threshold } ->
-    match is_showing threshold with
-    | false -> ()
-    | true ->
-      draw_string_at
-        (String.of_char char)
-        ~at
-        ~color:(fade c_ink ~by:(nearness threshold *. 0.5)));
   Array.iter t.strikes ~f:(fun { Strike.from; to_; threshold } ->
     match is_showing threshold with
     | false -> ()
