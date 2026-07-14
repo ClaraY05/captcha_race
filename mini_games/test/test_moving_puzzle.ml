@@ -46,26 +46,32 @@ let release game =
   update game ~mouse:{ x = 0; y = 0 } ~mouse_down:false ~mouse_clicked:false
 ;;
 
-let%expect_test "dragging the shape into the slot solves it" =
+let%expect_test "cornering the fleeing slot at the wall solves it" =
   let game = create () in
   print_s [%sexp (Moving_puzzle.is_solved game : bool)];
   [%expect {| false |}];
-  let target = Moving_puzzle.For_testing.target_offset game in
-  let game = grab_and_drag_to game ~offset:target in
-  (* Lined up before release. *)
-  print_s [%sexp (Moving_puzzle.For_testing.offset game = target : bool)];
-  [%expect {| true |}];
+  (* Drag hard to the right: the slot flees but is capped at the wall, so the
+     shape catches it there. (A huge offset clamps to the maximum.) *)
+  let game = grab_and_drag_to game ~offset:10_000 in
   let game = release game in
   print_s [%sexp (Moving_puzzle.is_solved game : bool)];
   [%expect {| true |}]
 ;;
 
-let%expect_test "releasing off-target snaps back and does not solve" =
+let%expect_test "the slot flees forward as the shape approaches" =
   let game = create () in
-  let target = Moving_puzzle.For_testing.target_offset game in
-  (* Drag well short of the slot (target is at least max_offset/3, so this
-     stays in range and is far outside the tolerance). *)
-  let game = grab_and_drag_to game ~offset:(target - 80) in
+  let start = Moving_puzzle.For_testing.target_offset game in
+  (* Drag up to where the slot started; it should have run further right. *)
+  let game = grab_and_drag_to game ~offset:start in
+  let fled = Moving_puzzle.For_testing.target_offset game in
+  print_s [%message "" ~fled_forward:(fled > start : bool)];
+  [%expect {| (fled_forward true) |}]
+;;
+
+let%expect_test "releasing short of the slot does not solve, and snaps back" =
+  let game = create () in
+  (* A small drag leaves the shape far from the slot. *)
+  let game = grab_and_drag_to game ~offset:20 in
   let game = release game in
   print_s
     [%message
@@ -98,23 +104,23 @@ let%expect_test "clicking away from the handle does not grab it" =
   [%expect {| (moved false) |}]
 ;;
 
-let%expect_test "the slot sits within the play area and to the right of the \
-                 start"
-  =
+let%expect_test "the slot stays within the play area, even when cornered" =
   let game = create () in
-  let target = Moving_puzzle.For_testing.target_offset game in
   let bounds = Layout.play_bounds in
-  let slot = Moving_puzzle.For_testing.slot_rect game in
   let within (rect : Geometry.Rect.t) =
     rect.x >= bounds.x
     && rect.y >= bounds.y
     && rect.x + rect.w <= bounds.x + bounds.w
     && rect.y + rect.h <= bounds.y + bounds.h
   in
+  let start_slot = Moving_puzzle.For_testing.slot_rect game in
+  (* Corner the slot at the wall, then check it is still on-screen. *)
+  let cornered = grab_and_drag_to game ~offset:10_000 in
+  let cornered_slot = Moving_puzzle.For_testing.slot_rect cornered in
   print_s
     [%message
       ""
-        ~target_is_a_real_drag:(target > 0 : bool)
-        ~slot_within_bounds:(within slot : bool)];
-  [%expect {| ((target_is_a_real_drag true) (slot_within_bounds true)) |}]
+        ~start_within:(within start_slot : bool)
+        ~cornered_within:(within cornered_slot : bool)];
+  [%expect {| ((start_within true) (cornered_within true)) |}]
 ;;

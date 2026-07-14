@@ -1,12 +1,14 @@
 open! Core
 open Captcha_race
 
-(* A slider-puzzle captcha. A shape sits at the left of the play area and an
-   empty slot waits at a random spot to its right. Dragging the handle along
-   the track at the bottom slides the shape horizontally by the same amount;
-   releasing it lined up with the slot (within [tolerance]) solves the game,
-   and releasing it anywhere else snaps the shape back to the start — like
-   the "slide to verify" captcha. *)
+(* A slider-puzzle captcha with a mischievous twist. A shape sits at the left
+   of the play area and an empty slot waits to its right. Dragging the handle
+   along the track slides the shape toward the slot — but the slot flees,
+   sliding away to stay [flee_gap] ahead as the shape approaches. It only
+   ever runs forward and never past the right wall, so the player can still
+   corner it at the edge and drop the shape in; releasing lined up (within
+   [tolerance]) solves the game, and releasing short snaps the shape back to
+   the start. *)
 
 type t =
   { bounds : Geometry.Rect.t
@@ -29,6 +31,9 @@ let handle_w = 48
 let margin = 16
 let label_gap = 10
 let tolerance = 10
+
+(* How far ahead of the shape the slot keeps as it flees. *)
+let flee_gap = 70
 
 (* Everything below is derived from [bounds] so the layout scales with the
    play area and nothing is hard-coded to a particular window size. The
@@ -68,8 +73,10 @@ let slot_rect t : Geometry.Rect.t =
 
 let create ~random ~(bounds : Geometry.Rect.t) =
   let max_off = max_offset bounds in
-  (* Keep the slot well away from the start so it is a real drag. *)
-  let target = Random.State.int_incl random (max_off / 3) max_off in
+  (* Start the slot short of the wall so it has room to flee toward it. *)
+  let target =
+    Random.State.int_incl random (max_off / 4) (max_off * 3 / 5)
+  in
   { bounds
   ; target
   ; offset = 0
@@ -98,13 +105,19 @@ let update t ~(input : Input.t) ~elapsed:(_ : Time_ns.Span.t) =
      | true ->
        (match input.mouse_down with
         | true ->
+          let max_off = max_offset t.bounds in
           let offset =
             Int.clamp_exn
               (input.mouse.x - t.grab_dx - track_x t.bounds)
               ~min:0
-              ~max:(max_offset t.bounds)
+              ~max:max_off
           in
-          { t with offset }
+          (* The slot flees to stay [flee_gap] ahead of the shape — but only
+             ever forward, and never past the wall, so it can be cornered. *)
+          let target =
+            Int.max t.target (Int.min max_off (offset + flee_gap))
+          in
+          { t with offset; target }
         | false ->
           (match Int.abs (t.offset - t.target) <= tolerance with
            | true ->
